@@ -366,7 +366,7 @@ select.inp { appearance: none; cursor: pointer; }
     <div id="binMeta" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
     <div style="margin-top:10px;display:flex;gap:8px">
       <button class="btn btn-primary" style="flex:1" id="loadBtn" onclick="loadBin()">
-        🔍 Load Inventory
+        ➜ Start Counting This Bin
       </button>
       <button class="btn btn-ghost" style="width:52px;flex:0 0 52px;min-height:52px" onclick="clearBin()" title="Clear">✕</button>
     </div>
@@ -628,22 +628,9 @@ async function loadBin() {
   const bin = document.getElementById('binInp').value.trim().toUpperCase()
   if (!bin) { toast('Enter a storage bin', 'warn'); return }
   S.bin = bin
+  S.items = []
+  S.bcId = null
   document.getElementById('binInp').value = bin
-  document.getElementById('loadBtn').disabled = true
-  setSap('loading', 'Loading from SAP…')
-
-  try {
-    const items = await fetchBinInventory(bin)
-    S.items = items.map((it, i) => ({
-      id: 'i' + i, material: it.material || '', materialDesc: it.materialDesc || '',
-      hu: it.hu || '', batch: it.batch || '', uom: it.uom || 'CS',
-      bookQty: parseFloat(it.bookQty) || 0, countedQty: null, confirmed: false,
-    }))
-    setSap('idle', S.items.length ? `${S.items.length} item(s) loaded` : 'No items found — enter manually')
-  } catch(e) {
-    setSap('idle', 'SAP unavailable — enter items manually')
-    toast('Load from SAP failed — enter counts manually', 'warn')
-  }
 
   /* Create Supabase bin_count record */
   if (sb && S.session) {
@@ -653,25 +640,16 @@ async function loadBin() {
     if (data) S.bcId = data.id
   }
 
-  document.getElementById('loadBtn').disabled = false
   document.getElementById('itemsPanel').style.display = 'block'
   document.getElementById('itemsTitle').textContent = `Items in ${bin}`
-  document.getElementById('binMeta').textContent = `${S.mode} · ${S.items.length} items`
+  document.getElementById('binMeta').textContent = `${S.mode} · enter items below`
+  setSap('idle', 'Ready to submit')
   renderItems()
+  /* Auto-open add item modal so they can start entering immediately */
+  openAddItem()
 }
 
-async function fetchBinInventory(bin) {
-  if (!navigator.onLine) throw new Error('offline')
-  const r = await fetch(`${CFG.sapProxyUrl}/api/sap`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'get_bin_inventory', bin, mode: S.mode, warehouse: CFG.warehouse }),
-  })
-  if (!r.ok) throw new Error(`Proxy error ${r.status}`)
-  const d = await r.json()
-  if (!d.ok) throw new Error(d.error || 'error')
-  return d.items || []
-}
+/* SAP inventory pre-load not available for EWM bins — items entered manually */
 
 function clearBin() {
   S.bin = ''; S.items = []; S.bcId = null
