@@ -577,7 +577,7 @@ async function startSession() {
   const name = document.getElementById('opCustom').value.trim()
   if (!name) { toast('Enter your name', 'warn'); return }
 
-  const id = 'sess_' + Date.now()
+  const id = crypto.randomUUID()
   S.session = { id, operatorName: name, startedAt: new Date().toISOString(), binsComplete: 0 }
 
   if (sb) {
