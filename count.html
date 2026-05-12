@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Novus 1730 · Cycle Count</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+/* ============================================================
+   Novus 1730 — Cycle Count  ·  Slate & Signal
+   Mobile-first floor counting app
+   ============================================================ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 16px; -webkit-tap-highlight-color: transparent; height: 100%; }
+
+:root {
+  --bg:          #101622;
+  --bg-card:     #0b1120;
+  --border:      #1c2840;
+  --focus:       #38bdf8;
+  --text:        #cbd5e1;
+  --dim:         #4a5568;
+  --muted:       #64748b;
+  --bright:      #e2e8f0;
+  --signal:      #38bdf8;
+  --green:       #059669;
+  --green-bg:    #04291a;
+  --green-brd:   #065f46;
+  --amber:       #b45309;
+  --amber-bg:    #1a1200;
+  --amber-brd:   #78350f;
+  --red:         #dc2626;
+  --red-bg:      #1a0606;
+  --red-brd:     #7f1d1d;
+  --mono:        'Courier New', monospace;
+  --font:        'Segoe UI', system-ui, -apple-system, sans-serif;
+  --r:           10px;
+  --rs:          6px;
+}
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+/* ── Offline banner ── */
+#offlineBanner {
+  display: none;
+  background: var(--amber-bg);
+  border-bottom: 1px solid var(--amber-brd);
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #fde68a;
+  text-align: center;
+}
+#offlineBanner.show { display: block; }
+
+/* ── App header ── */
+.hdr {
+  background: #0b1120;
+  border-bottom: 1px solid var(--border);
+  padding: 11px 15px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.hdr-logo { font-size: 15px; font-weight: 800; color: var(--signal); letter-spacing: 1.5px; }
+.hdr-sub  { font-size: 11px; color: var(--dim); }
+.hdr-pill {
+  background: var(--border); color: var(--muted);
+  border-radius: 20px; padding: 2px 9px;
+  font-size: 11px; font-weight: 700; letter-spacing: .5px;
+}
+.hdr-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.hdr-op { font-size: 12px; color: var(--muted); }
+.ico-btn {
+  background: none; border: none; cursor: pointer;
+  color: var(--dim); padding: 7px; border-radius: var(--rs);
+  font-size: 18px; line-height: 1; transition: all .15s;
+}
+.ico-btn:hover { background: var(--border); color: var(--bright); }
+
+/* ── Scrollable body ── */
+.body {
+  flex: 1; overflow-y: auto; padding: 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px;
+}
+
+/* ── Mode toggle ── */
+.mode-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.mode-btn {
+  padding: 14px 10px; border-radius: var(--r);
+  border: 2px solid var(--border); background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 13px;
+  font-weight: 700; text-align: center; transition: all .15s;
+}
+.mode-btn .ml { font-size: 11px; display: block; text-transform: uppercase; letter-spacing: .5px; }
+.mode-btn .ms { font-size: 12px; display: block; color: var(--dim); margin-top: 2px; font-weight: 400; }
+.mode-btn.active { border-color: var(--signal); background: rgba(56,189,248,.08); color: var(--signal); }
+.mode-btn.active .ms { color: rgba(56,189,248,.65); }
+
+/* ── Form ── */
+.lbl {
+  display: block; font-size: 11px; font-weight: 700;
+  color: var(--dim); text-transform: uppercase;
+  letter-spacing: .5px; margin-bottom: 5px;
+}
+.inp {
+  width: 100%; background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: var(--rs); color: var(--bright); padding: 12px 14px;
+  font-size: 16px; outline: none; transition: border-color .15s;
+  font-family: var(--font);
+}
+.inp:focus { border-color: var(--focus); }
+.inp.big {
+  font-size: 22px; font-family: var(--mono);
+  font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
+}
+select.inp { appearance: none; cursor: pointer; }
+
+/* ── Buttons ── */
+.btn {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 14px 18px; border-radius: var(--r);
+  border: none; cursor: pointer; font-size: 14px;
+  font-weight: 700; letter-spacing: .3px;
+  transition: background .15s, opacity .15s;
+  width: 100%; min-height: 52px; font-family: var(--font);
+}
+.btn:disabled { opacity: .38; cursor: not-allowed; }
+.btn-primary  { background: #0369a1; color: #fff; }
+.btn-success  { background: var(--green-bg); color: #6ee7b7; border: 1.5px solid var(--green); }
+.btn-ghost    { background: transparent; color: #94a3b8; border: 1.5px solid var(--border); }
+.btn-warn     { background: var(--amber-bg); color: #fde68a; border: 1.5px solid var(--amber-brd); }
+.btn-danger   { background: var(--red-bg); color: #fca5a5; border: 1.5px solid var(--red-brd); }
+.btn-sm       { padding: 9px 14px; font-size: 13px; min-height: 42px; }
+.g2           { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* ── Section header ── */
+.sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.sec      { font-size: 11px; font-weight: 800; color: var(--dim); text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── Count items ── */
+.item-list { display: flex; flex-direction: column; gap: 10px; }
+.ci {
+  background: var(--bg-card); border: 1.5px solid var(--border);
+  border-radius: var(--r); padding: 12px; transition: border-color .15s;
+}
+.ci.done     { border-color: var(--green); background: var(--green-bg); }
+.ci.hi-var   { border-color: #92400e; }
+.ci-top      { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+.ci-mat      { font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--bright); }
+.ci-desc     { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ci-hu       { font-family: var(--mono); font-size: 11px; color: var(--dim); margin-top: 1px; }
+.ci-book     { font-size: 12px; color: var(--muted); text-align: right; flex-shrink: 0; margin-left: 8px; }
+.ci-book strong { color: var(--bright); }
+.ci-row      { display: flex; align-items: center; gap: 8px; }
+.ci-input {
+  flex: 1; background: #131e2e; border: 1.5px solid var(--border);
+  border-radius: var(--rs); color: var(--bright); padding: 11px 12px;
+  font-size: 22px; font-family: var(--mono); font-weight: 700;
+  text-align: right; outline: none; min-width: 0;
+}
+.ci-input:focus { border-color: var(--focus); }
+.ci-uom   { font-size: 12px; color: var(--muted); flex-shrink: 0; min-width: 28px; }
+.ci-ok    {
+  padding: 11px 15px; border-radius: var(--rs);
+  border: 1.5px solid var(--green); background: var(--green-bg);
+  color: #6ee7b7; cursor: pointer; font-size: 18px; line-height: 1;
+  transition: all .15s; flex-shrink: 0;
+}
+.ci-ok:active { background: var(--green); color: #fff; }
+.ci-confirmed { display: flex; align-items: center; justify-content: space-between; }
+.ci-qty { font-family: var(--mono); font-size: 20px; font-weight: 700; color: #34d399; }
+.ci-edit { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 13px; padding: 4px 8px; }
+.vbadge { display: inline-block; padding: 2px 7px; border-radius: 20px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+.vp { background: #082f49; color: #38bdf8; }
+.vn { background: var(--red-bg); color: #fca5a5; }
+.vz { background: var(--green-bg); color: #34d399; }
+
+/* ── Progress ── */
+.prog-wrap { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
+.prog-bar  { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; background: var(--signal); border-radius: 2px; transition: width .3s; }
+
+/* ── SAP status ── */
+.sap-st {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px; border-radius: var(--rs);
+  font-size: 12px; font-weight: 600;
+}
+.sap-st.idle    { background: var(--border); color: var(--muted); }
+.sap-st.loading { background: #072a43; color: #7dd3fc; }
+.sap-st.success { background: var(--green-bg); color: #6ee7b7; }
+.sap-st.error   { background: var(--red-bg); color: #fca5a5; }
+.sap-st.queued  { background: var(--amber-bg); color: #fde68a; }
+
+/* ── Doc result ── */
+.doc-res {
+  background: var(--green-bg); border: 1.5px solid var(--green);
+  border-radius: var(--r); padding: 14px;
+}
+.doc-num  { font-family: var(--mono); font-size: 22px; font-weight: 700; color: #34d399; }
+.doc-meta { font-size: 12px; color: #34d399; opacity: .8; margin-top: 4px; }
+
+/* ── Alerts ── */
+.al { padding: 10px 12px; border-radius: var(--rs); font-size: 13px; line-height: 1.5; }
+.al-info { background: #072a43; border: 1px solid #0c4a70; color: #7dd3fc; }
+.al-ok   { background: var(--green-bg); border: 1px solid var(--green-brd); color: #6ee7b7; }
+.al-warn { background: var(--amber-bg); border: 1px solid var(--amber-brd); color: #fde68a; }
+.al-err  { background: var(--red-bg); border: 1px solid var(--red-brd); color: #fca5a5; }
+
+/* ── Spinner ── */
+@keyframes spin { to { transform: rotate(360deg); } }
+.spin {
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--border); border-top-color: var(--signal);
+  border-radius: 50%; animation: spin .65s linear infinite; flex-shrink: 0;
+}
+
+/* ── Toast ── */
+.toast-wrap {
+  position: fixed; bottom: 24px; left: 50%;
+  transform: translateX(-50%); z-index: 9999;
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; pointer-events: none;
+  width: calc(100% - 32px); max-width: 420px;
+}
+.toast {
+  background: #1e293b; color: var(--bright); padding: 12px 16px;
+  border-radius: var(--r); font-size: 13px; font-weight: 600;
+  box-shadow: 0 4px 20px rgba(0,0,0,.55);
+  border-left: 4px solid var(--signal);
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .2s, transform .2s; width: 100%;
+}
+.toast.show  { opacity: 1; transform: none; }
+.toast.ok    { border-left-color: var(--green); }
+.toast.err   { border-left-color: var(--red); }
+.toast.warn  { border-left-color: var(--amber); }
+
+/* ── Bottom-sheet modals ── */
+.mo {
+  position: fixed; inset: 0; background: rgba(0,0,0,.72);
+  z-index: 500; display: flex; align-items: flex-end;
+  justify-content: center; opacity: 0; pointer-events: none;
+  transition: opacity .2s;
+}
+.mo.open { opacity: 1; pointer-events: all; }
+.mo-box {
+  background: #0f1929; border: 1px solid var(--border);
+  border-top-left-radius: 20px; border-top-right-radius: 20px;
+  padding: 20px 20px 44px; width: 100%; max-width: 520px;
+  transform: translateY(100%); transition: transform .25s ease;
+  max-height: 80dvh; overflow-y: auto;
+}
+.mo.open .mo-box { transform: none; }
+.mo-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 16px; }
+.mo-title  { font-size: 16px; font-weight: 700; color: var(--bright); margin-bottom: 16px; }
+.field     { margin-bottom: 12px; }
+
+/* ── Session overlay ── */
+#sessOverlay {
+  position: fixed; inset: 0; background: var(--bg);
+  z-index: 1000; display: flex; align-items: center;
+  justify-content: center; padding: 24px;
+}
+.sess-card {
+  background: var(--bg-card); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 28px 22px;
+  width: 100%; max-width: 380px;
+}
+.sess-logo     { font-size: 24px; font-weight: 800; color: var(--signal); letter-spacing: 2px; margin-bottom: 4px; }
+.sess-sub      { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+/* (operator grid styles removed — name input only) */
+
+/* ── Log items ── */
+.log-item {
+  background: var(--border); border-radius: var(--rs);
+  padding: 10px 12px; font-size: 12px; color: var(--text);
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+}
+.log-bin  { font-family: var(--mono); font-weight: 700; color: var(--bright); }
+.divider  { height: 1px; background: var(--border); margin: 12px 0; }
+</style>
+</head>
+<body>
+
+<!-- Offline banner -->
+<div id="offlineBanner">
+  ⚠ No network — counts queued and will sync when reconnected
+</div>
+
+<!-- Session start overlay -->
+<div id="sessOverlay">
+  <div class="sess-card">
+    <div class="sess-logo">NOVUS</div>
+    <div class="sess-sub">Cycle Count · Plant 1730</div>
+
+    <label class="lbl">Your name</label>
+    <input class="inp" id="opCustom" placeholder="Enter your name" type="text"
+           oninput="onCustomName()" onkeydown="if(event.key==='Enter')startSession()">
+    <div style="height:14px"></div>
+
+    <button class="btn btn-primary" id="startBtn" disabled onclick="startSession()">
+      Start Count Session
+    </button>
+  </div>
+</div>
+
+<!-- App header -->
+<header class="hdr">
+  <div>
+    <div class="hdr-logo">NOVUS</div>
+    <div class="hdr-sub">Cycle Count</div>
+  </div>
+  <div class="hdr-pill">Plant 1730</div>
+  <div class="hdr-right">
+    <span class="hdr-op" id="hdrOp"></span>
+    <button class="ico-btn" onclick="showLog()" title="Session log">📋</button>
+    <button class="ico-btn" onclick="endSession()" title="End session">✕</button>
+  </div>
+</header>
+
+<!-- Main body -->
+<div class="body" id="mainBody">
+
+  <!-- Mode selector -->
+  <div class="mode-grid">
+    <button class="mode-btn active" id="modeHL" onclick="setMode('HL')">
+      <span class="ml">HL Mode</span>
+      <span class="ms">Full bin count</span>
+    </button>
+    <button class="mode-btn" id="modeHS" onclick="setMode('HS')">
+      <span class="ml">HS Mode</span>
+      <span class="ms">Single item</span>
+    </button>
+  </div>
+
+  <!-- Bin input -->
+  <div class="card">
+    <label class="lbl">Storage Bin</label>
+    <input class="inp big" id="binInp" placeholder="WA00A" maxlength="10"
+           autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false"
+           onkeydown="if(event.key==='Enter')loadBin()">
+    <div id="binMeta" style="margin-top:6px;font-size:12px;color:var(--muted)"></div>
+    <div style="margin-top:10px;display:flex;gap:8px">
+      <button class="btn btn-primary" style="flex:1" id="loadBtn" onclick="loadBin()">
+        🔍 Load Inventory
+      </button>
+      <button class="btn btn-ghost" style="width:52px;flex:0 0 52px;min-height:52px" onclick="clearBin()" title="Clear">✕</button>
+    </div>
+  </div>
+
+  <!-- Items panel -->
+  <div id="itemsPanel" style="display:none">
+
+    <!-- Progress card -->
+    <div class="card">
+      <div class="prog-wrap">
+        <span class="sec" id="progLabel">Count Progress</span>
+        <span style="font-size:12px;color:var(--muted)" id="progCount">0 / 0</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
+    </div>
+
+    <!-- Items -->
+    <div class="card">
+      <div class="sec-head">
+        <span class="sec" id="itemsTitle">Items</span>
+        <button class="btn btn-ghost btn-sm" onclick="openAddItem()"
+                style="width:auto;min-height:36px;padding:6px 12px">+ Add</button>
+      </div>
+      <div class="item-list" id="itemList"></div>
+    </div>
+
+    <!-- Quick actions -->
+    <div class="g2">
+      <button class="btn btn-warn" onclick="openIssue()">📍 Location Issue</button>
+      <button class="btn btn-ghost" onclick="openReprint()">🏷️ HU Reprint</button>
+    </div>
+
+    <!-- SAP status -->
+    <div class="sap-st idle" id="sapSt">
+      <span class="spin" id="sapSpin" style="display:none"></span>
+      <span id="sapStTxt">Ready to submit</span>
+    </div>
+
+    <!-- Submit -->
+    <button class="btn btn-success" id="submitBtn" onclick="submitCount()"
+            style="min-height:62px;font-size:16px;letter-spacing:.5px">
+      ✓ Submit Count to SAP
+    </button>
+
+    <!-- Result -->
+    <div id="submitResult" style="display:none"></div>
+
+  </div>
+
+</div>
+
+<!-- Issue modal -->
+<div class="mo" id="moIssue" onclick="if(event.target===this)closeMo('moIssue')">
+  <div class="mo-box">
+    <div class="mo-handle"></div>
+    <div class="mo-title">📍 Log Location Issue</div>
+    <div class="al al-warn" style="margin-bottom:12px">
+      Item found in bin: <strong id="issFromBin" style="font-family:var(--mono)">—</strong>
+    </div>
+    <div class="field">
+      <label class="lbl">Correct bin (where it should be)</label>
+      <input class="inp big" id="issToBin" placeholder="WA00A"
+             autocapitalize="characters" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lbl">Material (optional)</label>
+      <input class="inp" id="issMat" placeholder="Material number">
+    </div>
+    <div class="field">
+      <label class="lbl">HU number (optional)</label>
+      <input class="inp" id="issHU" placeholder="HU number">
+    </div>
+    <div class="field">
+      <label class="lbl">Notes</label>
+      <input class="inp" id="issNotes" placeholder="Any notes">
+    </div>
+    <button class="btn btn-warn" onclick="logIssue()">Log Issue</button>
+  </div>
+</div>
+
+<!-- Reprint modal -->
+<div class="mo" id="moReprint" onclick="if(event.target===this)closeMo('moReprint')">
+  <div class="mo-box">
+    <div class="mo-handle"></div>
+    <div class="mo-title">🏷️ Request HU Reprint</div>
+    <div class="field">
+      <label class="lbl">HU Number</label>
+      <input class="inp big" id="rpHU" placeholder="HU number" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lbl">Material</label>
+      <input class="inp" id="rpMat" placeholder="Material number">
+    </div>
+    <div class="field">
+      <label class="lbl">Reason</label>
+      <select class="inp" id="rpReason">
+        <option value="wrong_qty">Wrong quantity on label</option>
+        <option value="damaged">Label damaged / unreadable</option>
+        <option value="missing">Label missing</option>
+        <option value="other">Other</option>
+      </select>
+    </div>
+    <button class="btn btn-primary" onclick="logReprint()">Request Reprint</button>
+  </div>
+</div>
+
+<!-- Add item modal -->
+<div class="mo" id="moAddItem" onclick="if(event.target===this)closeMo('moAddItem')">
+  <div class="mo-box">
+    <div class="mo-handle"></div>
+    <div class="mo-title">+ Add Item Manually</div>
+    <div class="field">
+      <label class="lbl">Material Number</label>
+      <input class="inp big" id="addMat" placeholder="Material" autocomplete="off">
+    </div>
+    <div class="field">
+      <label class="lbl">HU Number (optional)</label>
+      <input class="inp" id="addHU" placeholder="HU number">
+    </div>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:10px;margin-bottom:12px">
+      <div class="field" style="margin-bottom:0">
+        <label class="lbl">Book Qty</label>
+        <input class="inp" id="addBook" type="number" placeholder="0" min="0">
+      </div>
+      <div class="field" style="margin-bottom:0">
+        <label class="lbl">UoM</label>
+        <input class="inp" id="addUom" placeholder="CS" value="CS">
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="confirmAddItem()">Add Item</button>
+  </div>
+</div>
+
+<!-- Session log modal -->
+<div class="mo" id="moLog" onclick="if(event.target===this)closeMo('moLog')">
+  <div class="mo-box">
+    <div class="mo-handle"></div>
+    <div class="mo-title">📋 Session Log</div>
+    <div id="logContent"></div>
+  </div>
+</div>
+
+<!-- Toasts -->
+<div class="toast-wrap" id="toastWrap"></div>
+
+<script>
+/* ============================================================
+   CONFIG  — set your Supabase project values
+   ============================================================ */
+const CFG = {
+  supabaseUrl  : 'https://njgrgfzbhnnhnondzati.supabase.co',
+  supabaseAnon : 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5qZ3JnZnpiaG5uaG5vbmR6YXRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg1OTM0MjQsImV4cCI6MjA5NDE2OTQyNH0.VDYjpIQUCGWZykDK5OWjw2Rnq9l8YP1eSkxFoZqBW04',
+  warehouse    : '1730',
+  fiscalYear   : '2026',
+  operators    : [],   /* Add names here, or leave empty to use text input only */
+}
+const PROXY = `${CFG.supabaseUrl}/functions/v1/sap-proxy`
+
+/* ============================================================
+   SUPABASE CLIENT
+   ============================================================ */
+const sb = window.supabase?.createClient?.(CFG.supabaseUrl, CFG.supabaseAnon)
+
+/* ============================================================
+   STATE
+   ============================================================ */
+const S = {
+  session   : null,   // {id, operatorName, startedAt, binsComplete}
+  mode      : 'HL',
+  bin       : '',
+  bcId      : null,   // bin_count row id
+  items     : [],     // [{id,material,materialDesc,hu,batch,uom,bookQty,countedQty,confirmed}]
+  issues    : [],
+  reprints  : [],
+  queue     : [],     // offline queue
+}
+
+/* ── Offline queue ── */
+function qLoad() { try { S.queue = JSON.parse(localStorage.getItem('ncc_q') || '[]') } catch(_){} }
+function qSave() { localStorage.setItem('ncc_q', JSON.stringify(S.queue)) }
+
+/* ── Online/offline ── */
+function chkOnline() {
+  document.getElementById('offlineBanner').classList.toggle('show', !navigator.onLine)
+  if (navigator.onLine) flushQueue()
+}
+window.addEventListener('online',  chkOnline)
+window.addEventListener('offline', chkOnline)
+
+/* ============================================================
+   SESSION
+   ============================================================ */
+function initSession() {
+  /* Auto-focus name field */
+  setTimeout(() => document.getElementById('opCustom')?.focus(), 100)
+}
+
+function pickOp(_el, _name) { /* unused — no preset buttons */ }
+
+function onCustomName() {
+  const v = document.getElementById('opCustom').value.trim()
+  document.querySelectorAll('.op-btn').forEach(b => b.classList.remove('sel'))
+  document.getElementById('startBtn').disabled = !v
+}
+
+async function startSession() {
+  const name = document.getElementById('opCustom').value.trim()
+  if (!name) { toast('Enter your name', 'warn'); return }
+
+  const id = 'sess_' + Date.now()
+  S.session = { id, operatorName: name, startedAt: new Date().toISOString(), binsComplete: 0 }
+
+  if (sb) {
+    const { data } = await sb.from('count_sessions').insert({
+      id, operator_name: name, warehouse: CFG.warehouse,
+      started_at: S.session.startedAt, status: 'active',
+    }).select().single()
+    if (data) S.session.id = data.id
+  }
+
+  document.getElementById('sessOverlay').style.display = 'none'
+  document.getElementById('hdrOp').textContent = name
+  toast(`Session started — ${name}`, 'ok')
+  setTimeout(() => document.getElementById('binInp').focus(), 300)
+}
+
+async function endSession() {
+  if (!confirm('End this count session?')) return
+  if (sb && S.session) {
+    await sb.from('count_sessions').update({
+      completed_at: new Date().toISOString(),
+      status: 'complete', bin_count: S.session.binsComplete,
+    }).eq('id', S.session.id)
+  }
+  S.session = null
+  clearBin()
+  document.getElementById('hdrOp').textContent = ''
+  document.getElementById('sessOverlay').style.display = 'flex'
+  toast('Session ended', 'ok')
+}
+
+/* ============================================================
+   MODE
+   ============================================================ */
+function setMode(m) {
+  S.mode = m
+  document.getElementById('modeHL').classList.toggle('active', m === 'HL')
+  document.getElementById('modeHS').classList.toggle('active', m === 'HS')
+  S.items = []
+  renderItems()
+}
+
+/* ============================================================
+   BIN
+   ============================================================ */
+async function loadBin() {
+  const bin = document.getElementById('binInp').value.trim().toUpperCase()
+  if (!bin) { toast('Enter a storage bin', 'warn'); return }
+  S.bin = bin
+  document.getElementById('binInp').value = bin
+  document.getElementById('loadBtn').disabled = true
+  setSap('loading', 'Loading from SAP…')
+
+  try {
+    const items = await fetchBinInventory(bin)
+    S.items = items.map((it, i) => ({
+      id: 'i' + i, material: it.material || '', materialDesc: it.materialDesc || '',
+      hu: it.hu || '', batch: it.batch || '', uom: it.uom || 'CS',
+      bookQty: parseFloat(it.bookQty) || 0, countedQty: null, confirmed: false,
+    }))
+    setSap('idle', S.items.length ? `${S.items.length} item(s) loaded` : 'No items found — enter manually')
+  } catch(e) {
+    setSap('idle', 'SAP unavailable — enter items manually')
+    toast('Load from SAP failed — enter counts manually', 'warn')
+  }
+
+  /* Create Supabase bin_count record */
+  if (sb && S.session) {
+    const { data } = await sb.from('bin_counts').insert({
+      session_id: S.session.id, bin, procedure: S.mode, sap_status: 'pending',
+    }).select().single()
+    if (data) S.bcId = data.id
+  }
+
+  document.getElementById('loadBtn').disabled = false
+  document.getElementById('itemsPanel').style.display = 'block'
+  document.getElementById('itemsTitle').textContent = `Items in ${bin}`
+  document.getElementById('binMeta').textContent = `${S.mode} · ${S.items.length} items`
+  renderItems()
+}
+
+async function fetchBinInventory(bin) {
+  if (!navigator.onLine) throw new Error('offline')
+  const r = await fetch(PROXY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CFG.supabaseAnon}` },
+    body: JSON.stringify({ action: 'get_bin_inventory', bin, mode: S.mode, warehouse: CFG.warehouse }),
+  })
+  if (!r.ok) throw new Error(`${r.status}`)
+  const d = await r.json()
+  if (!d.ok) throw new Error(d.error || 'error')
+  return d.items || []
+}
+
+function clearBin() {
+  S.bin = ''; S.items = []; S.bcId = null
+  document.getElementById('binInp').value = ''
+  document.getElementById('binMeta').textContent = ''
+  document.getElementById('itemsPanel').style.display = 'none'
+  document.getElementById('submitResult').style.display = 'none'
+  setSap('idle', 'Ready to submit')
+}
+
+/* ============================================================
+   ITEMS
+   ============================================================ */
+function renderItems() {
+  const el = document.getElementById('itemList')
+  if (!S.items.length) {
+    el.innerHTML = `<div class="al al-info" style="text-align:center">
+      No items loaded. Use + Add to enter manually.</div>`
+    updProg(); return
+  }
+  el.innerHTML = S.items.map(it => {
+    const v = it.confirmed && it.bookQty !== null ? (it.countedQty - it.bookQty) : null
+    const vcls = v === null ? '' : v > 0 ? 'vp' : v < 0 ? 'vn' : 'vz'
+    const vlbl = v === null ? '' : `${v > 0 ? '+' : ''}${v}`
+    return `<div class="ci ${it.confirmed ? 'done' : ''} ${v && v!==0 ? 'hi-var' : ''}" id="ci-${it.id}">
+      <div class="ci-top">
+        <div>
+          <div class="ci-mat">${it.material}${v!==null?`<span class="vbadge ${vcls}">${vlbl}</span>`:''}</div>
+          ${it.materialDesc ? `<div class="ci-desc">${it.materialDesc}</div>` : ''}
+          ${it.hu ? `<div class="ci-hu">HU: ${it.hu}</div>` : ''}
+        </div>
+        <div class="ci-book">Book<br><strong>${it.bookQty ?? '—'}</strong><span style="font-size:11px;display:block">${it.uom}</span></div>
+      </div>
+      ${it.confirmed
+        ? `<div class="ci-confirmed">
+             <span class="ci-qty">✓ ${it.countedQty} ${it.uom}</span>
+             <button class="ci-edit" onclick="editItem('${it.id}')">Edit</button>
+           </div>`
+        : `<div class="ci-row">
+             <input class="ci-input" type="number" step="0.001" min="0" id="q-${it.id}"
+                    placeholder="${it.bookQty ?? '0'}"
+                    value="${it.countedQty ?? ''}"
+                    oninput="cacheQty('${it.id}',this.value)"
+                    onkeydown="if(event.key==='Enter')okItem('${it.id}')">
+             <span class="ci-uom">${it.uom}</span>
+             <button class="ci-ok" onclick="okItem('${it.id}')">✓</button>
+           </div>`
+      }
+    </div>`
+  }).join('')
+  updProg()
+}
+
+function cacheQty(id, v) {
+  const it = S.items.find(i => i.id === id)
+  if (it) it.countedQty = v === '' ? null : parseFloat(v)
+}
+
+function okItem(id) {
+  const it = S.items.find(i => i.id === id)
+  if (!it) return
+  const inp = document.getElementById(`q-${id}`)
+  const val = inp ? parseFloat(inp.value) : it.countedQty
+  if (val === null || val === undefined || isNaN(val)) {
+    toast('Enter a quantity', 'warn'); inp?.focus(); return
+  }
+  it.countedQty = val; it.confirmed = true
+  renderItems()
+  const next = S.items.find(i => !i.confirmed)
+  if (next) setTimeout(() => document.getElementById(`q-${next.id}`)?.focus(), 80)
+}
+
+function editItem(id) {
+  const it = S.items.find(i => i.id === id)
+  if (it) { it.confirmed = false; renderItems() }
+  setTimeout(() => document.getElementById(`q-${id}`)?.focus(), 80)
+}
+
+function updProg() {
+  const total = S.items.length, done = S.items.filter(i => i.confirmed).length
+  const pct = total ? Math.round(done/total*100) : 0
+  document.getElementById('progCount').textContent = `${done} / ${total}`
+  document.getElementById('progFill').style.width = `${pct}%`
+  document.getElementById('progLabel').textContent =
+    !total ? 'No items' : done===total ? `✓ All ${total} counted` : 'Count Progress'
+}
+
+/* ── Add item manually ── */
+function openAddItem() {
+  ['addMat','addHU','addBook'].forEach(id => document.getElementById(id).value = '')
+  document.getElementById('addUom').value = 'CS'
+  openMo('moAddItem')
+  setTimeout(() => document.getElementById('addMat').focus(), 200)
+}
+
+function confirmAddItem() {
+  const mat = document.getElementById('addMat').value.trim()
+  if (!mat) { toast('Enter a material number', 'warn'); return }
+  S.items.push({
+    id: 'i' + Date.now(), material: mat, materialDesc: '',
+    hu: document.getElementById('addHU').value.trim(),
+    batch: '', uom: document.getElementById('addUom').value || 'CS',
+    bookQty: parseFloat(document.getElementById('addBook').value) || 0,
+    countedQty: null, confirmed: false, manual: true,
+  })
+  renderItems(); closeMo('moAddItem')
+  toast(`${mat} added`, 'ok')
+  const last = S.items[S.items.length - 1]
+  setTimeout(() => document.getElementById(`q-${last.id}`)?.focus(), 200)
+}
+
+/* ============================================================
+   ISSUE + REPRINT
+   ============================================================ */
+function openIssue() {
+  document.getElementById('issFromBin').textContent = S.bin || '—'
+  ;['issToBin','issMat','issHU','issNotes'].forEach(id => document.getElementById(id).value = '')
+  openMo('moIssue')
+  setTimeout(() => document.getElementById('issToBin').focus(), 200)
+}
+
+async function logIssue() {
+  const to = document.getElementById('issToBin').value.trim().toUpperCase()
+  if (!to) { toast('Enter the correct bin', 'warn'); return }
+  const issue = {
+    id: 'iss_' + Date.now(), binFound: S.bin, binSystem: to,
+    material: document.getElementById('issMat').value.trim(),
+    hu: document.getElementById('issHU').value.trim(),
+    notes: document.getElementById('issNotes').value.trim(),
+    ts: new Date().toISOString(),
+  }
+  S.issues.push(issue)
+  if (sb && S.session) {
+    await sb.from('location_issues').insert({
+      session_id: S.session.id, bin_found: issue.binFound,
+      bin_system: issue.binSystem, material: issue.material || null,
+      hu_number: issue.hu || null, notes: issue.notes || null,
+    })
+  }
+  closeMo('moIssue')
+  toast(`Issue logged: ${S.bin} → ${to}`, 'warn')
+}
+
+function openReprint() {
+  ;['rpHU','rpMat'].forEach(id => document.getElementById(id).value = '')
+  document.getElementById('rpReason').value = 'wrong_qty'
+  openMo('moReprint')
+  setTimeout(() => document.getElementById('rpHU').focus(), 200)
+}
+
+async function logReprint() {
+  const hu = document.getElementById('rpHU').value.trim()
+  if (!hu) { toast('Enter an HU number', 'warn'); return }
+  const rp = {
+    id: 'rp_' + Date.now(), hu,
+    material: document.getElementById('rpMat').value.trim(),
+    reason: document.getElementById('rpReason').value,
+    ts: new Date().toISOString(),
+  }
+  S.reprints.push(rp)
+  if (sb && S.session) {
+    await sb.from('hu_reprints').insert({
+      session_id: S.session.id, hu_number: rp.hu,
+      material: rp.material || null, reason: rp.reason,
+    })
+  }
+  closeMo('moReprint')
+  toast(`HU reprint queued: ${hu}`, 'ok')
+}
+
+/* ============================================================
+   SUBMIT
+   ============================================================ */
+async function submitCount() {
+  if (!S.bin) { toast('Enter a bin first', 'warn'); return }
+  const confirmed = S.items.filter(i => i.confirmed)
+  if (!confirmed.length) { toast('Confirm at least one item', 'warn'); return }
+
+  const unconf = S.items.length - confirmed.length
+  if (unconf > 0 && !confirm(`${unconf} item(s) not confirmed. Submit confirmed items only?`)) return
+
+  const payload = {
+    action: 'submit_count', warehouse: CFG.warehouse, fiscalYear: CFG.fiscalYear,
+    bin: S.bin, mode: S.mode, sessionId: S.session?.id, binCountId: S.bcId,
+    items: confirmed.map(i => ({
+      material: i.material, hu: i.hu, batch: i.batch,
+      uom: i.uom, bookQty: i.bookQty, countedQty: i.countedQty,
+    })),
+  }
+
+  setSap('loading', 'Submitting to SAP…')
+  document.getElementById('submitBtn').disabled = true
+
+  /* Write items to Supabase */
+  if (sb && S.bcId) {
+    for (const it of confirmed) {
+      await sb.from('count_items').insert({
+        bin_count_id: S.bcId, material: it.material,
+        material_desc: it.materialDesc || null, hu_number: it.hu || null,
+        batch: it.batch || null, uom: it.uom,
+        book_qty: it.bookQty, counted_qty: it.countedQty,
+      })
+    }
+  }
+
+  /* Offline: queue it */
+  if (!navigator.onLine) {
+    S.queue.push({ payload, bin: S.bin, ts: Date.now() })
+    qSave()
+    setSap('queued', `Queued — ${S.queue.length} pending`)
+    showResult('queued', null)
+    document.getElementById('submitBtn').disabled = false
+    toast('Offline — queued for later', 'warn')
+    return
+  }
+
+  try {
+    const r = await fetch(PROXY, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CFG.supabaseAnon}` },
+      body: JSON.stringify(payload),
+    })
+    const d = await r.json()
+    if (!d.ok) throw new Error(d.error || 'SAP error')
+
+    setSap('success', '✓ Posted to SAP')
+    showResult('success', d)
+
+    if (sb && S.bcId) {
+      await sb.from('bin_counts').update({
+        pi_doc_number: d.piDoc || null, wt_number: d.wtNumber || null,
+        sap_status: 'posted', posted_at: new Date().toISOString(),
+      }).eq('id', S.bcId)
+    }
+
+    /* Accuracy KPI */
+    if (sb && S.session) {
+      const total = confirmed.length
+      const acc   = confirmed.filter(i => i.countedQty === i.bookQty).length
+      await sb.from('bin_accuracy_log').insert({
+        bin: S.bin, session_id: S.session.id,
+        total_items: total, accurate_items: acc,
+        accuracy_pct: total ? Math.round(acc/total*100) : 0,
+      })
+    }
+
+    if (S.session) S.session.binsComplete++
+    toast(`✓ Count posted — ${S.bin}`, 'ok')
+
+  } catch(e) {
+    setSap('error', `Error: ${e.message}`)
+    if (sb && S.bcId) {
+      await sb.from('bin_counts').update({
+        sap_status: 'failed', sap_error: e.message,
+      }).eq('id', S.bcId)
+    }
+    toast(`SAP error: ${e.message}`, 'err')
+    document.getElementById('submitBtn').disabled = false
+  }
+}
+
+function showResult(status, d) {
+  const el = document.getElementById('submitResult')
+  el.style.display = 'block'
+  if (status === 'success') {
+    el.innerHTML = `<div class="doc-res">
+      ${d?.piDoc ? `<div class="doc-num">${d.piDoc}</div>
+        <div class="doc-meta">PI Doc · Bin ${S.bin} · ${new Date().toLocaleTimeString()}</div>` : ''}
+      ${d?.wtNumber ? `<div style="margin-top:8px;font-size:13px;color:#34d399">WT: <strong style="font-family:var(--mono)">${d.wtNumber}</strong></div>` : ''}
+      <div style="margin-top:14px">
+        <button class="btn btn-ghost btn-sm" onclick="nextBin()" style="width:auto;min-height:40px">
+          Count Next Bin →
+        </button>
+      </div>
+    </div>`
+  } else {
+    el.innerHTML = `<div class="al al-warn">
+      ⏳ Queued. Will submit when reconnected.
+      <div style="margin-top:8px">
+        <button class="btn btn-ghost btn-sm" onclick="nextBin()" style="width:auto;min-height:40px">
+          Count Next Bin →
+        </button>
+      </div>
+    </div>`
+  }
+}
+
+function nextBin() { clearBin(); document.getElementById('binInp').focus() }
+
+/* ============================================================
+   OFFLINE QUEUE FLUSH
+   ============================================================ */
+async function flushQueue() {
+  if (!S.queue.length || !navigator.onLine) return
+  setSap('loading', `Flushing ${S.queue.length} queued submission(s)…`)
+  const pending = [...S.queue]; S.queue = []; qSave()
+  for (const entry of pending) {
+    try {
+      const r = await fetch(PROXY, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${CFG.supabaseAnon}` },
+        body: JSON.stringify(entry.payload),
+      })
+      const d = await r.json()
+      if (!d.ok) throw new Error(d.error)
+      toast(`✓ Queued count for ${entry.bin} submitted`, 'ok')
+    } catch(e) {
+      S.queue.push(entry)
+      toast(`Failed to flush ${entry.bin}: ${e.message}`, 'err')
+    }
+  }
+  qSave(); setSap('idle', 'Ready to submit')
+}
+
+/* ============================================================
+   SESSION LOG
+   ============================================================ */
+function showLog() {
+  let html = ''
+  if (S.session) {
+    html += `<div style="font-size:13px;color:var(--muted);margin-bottom:12px">
+      ${S.session.operatorName} · Since ${new Date(S.session.startedAt).toLocaleTimeString()}
+      · ${S.session.binsComplete} bin(s) done
+    </div>`
+  }
+  if (S.issues.length) {
+    html += `<div class="sec" style="margin-bottom:8px">Issues (${S.issues.length})</div>`
+    html += S.issues.map(i => `<div class="log-item">
+      <div><div class="log-bin">${i.binFound} → ${i.binSystem}</div>
+      ${i.material ? `<div style="font-size:11px;color:var(--muted)">${i.material}</div>` : ''}</div>
+      <span style="font-size:11px;color:var(--muted)">${new Date(i.ts).toLocaleTimeString()}</span>
+    </div>`).join('') + '<div class="divider"></div>'
+  }
+  if (S.reprints.length) {
+    html += `<div class="sec" style="margin-bottom:8px">Reprints (${S.reprints.length})</div>`
+    html += S.reprints.map(r => `<div class="log-item">
+      <div><div class="log-bin">${r.hu}</div>
+      <div style="font-size:11px;color:var(--muted)">${r.reason.replace('_',' ')}</div></div>
+      <span style="font-size:11px;color:var(--muted)">${new Date(r.ts).toLocaleTimeString()}</span>
+    </div>`).join('')
+  }
+  if (!S.issues.length && !S.reprints.length) {
+    html = '<div style="text-align:center;color:var(--muted);font-size:13px;padding:20px 0">Nothing logged yet</div>'
+  }
+  document.getElementById('logContent').innerHTML = html
+  openMo('moLog')
+}
+
+/* ============================================================
+   SAP STATUS HELPER
+   ============================================================ */
+function setSap(status, text) {
+  const el = document.getElementById('sapSt')
+  const sp = document.getElementById('sapSpin')
+  el.className = `sap-st ${status}`
+  sp.style.display = status === 'loading' ? 'inline-block' : 'none'
+  document.getElementById('sapStTxt').textContent = text
+}
+
+/* ============================================================
+   MODAL HELPERS
+   ============================================================ */
+function openMo(id)  { document.getElementById(id).classList.add('open') }
+function closeMo(id) { document.getElementById(id).classList.remove('open') }
+
+/* ============================================================
+   TOAST
+   ============================================================ */
+function toast(msg, type = 'info') {
+  const el = document.createElement('div')
+  el.className = `toast ${type}`; el.textContent = msg
+  document.getElementById('toastWrap').appendChild(el)
+  requestAnimationFrame(() => el.classList.add('show'))
+  setTimeout(() => {
+    el.classList.remove('show')
+    setTimeout(() => el.remove(), 250)
+  }, 3200)
+}
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+qLoad(); chkOnline(); initSession()
+</script>
+</body>
+</html>
